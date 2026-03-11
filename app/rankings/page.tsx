@@ -39,7 +39,7 @@ export default function RankingsPage() {
     <>
       <Header title="着金ランキング" subtitle="チームの競争状況をリアルタイムで確認" />
 
-      <div className="p-6 space-y-5">
+      <div className="p-3 md:p-6 space-y-5">
         {/* ヘッダーパネル */}
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-5 shadow-xl">
           <div className="flex items-center gap-2 mb-4">

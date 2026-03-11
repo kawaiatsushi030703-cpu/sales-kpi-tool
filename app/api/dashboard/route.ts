@@ -1,11 +1,20 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCurrentMonthRange, getCurrentWeekRange, calcAchievementRate, getWeekNumber } from '@/lib/utils'
+import { getCurrentMonthRange, getCurrentWeekRange, calcAchievementRate, getWeekNumber, getThursdayWeeks } from '@/lib/utils'
 
 const ANNUAL_TARGETS = {
   総合: 1_000_000_000,
   物販: 300_000_000,
   AI: 700_000_000,
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET',
+    },
+  })
 }
 
 export async function GET() {
@@ -78,31 +87,25 @@ export async function GET() {
     // 週間目標 = 年間目標 ÷ 52
     const weeklyTarget = weekGoal?.targetAmount ?? Math.round(ANNUAL_TARGETS.総合 / 52)
 
-    // 月内4週分の集計（W1: 1-7日, W2: 8-14日, W3: 15-21日, W4: 22日-月末）
+    // 月内4週分の集計（木曜始まり）
     const monthPaymentsAll = await prisma.payment.findMany({
       where: { paidAt: { gte: monthStart, lte: monthEnd } },
       include: { deal: { select: { category: true } } },
     })
     const buhanWeekTarget = monthBuhanGoal?.targetAmount ? Math.round(monthBuhanGoal.targetAmount / 4) : Math.round(30_000_000 / 4)
     const aiWeekTarget = monthAIGoal?.targetAmount ? Math.round(monthAIGoal.targetAmount / 4) : Math.round(70_000_000 / 4)
-    const weeks = [
-      { label: 'W1', start: 1, end: 7 },
-      { label: 'W2', start: 8, end: 14 },
-      { label: 'W3', start: 15, end: 21 },
-      { label: 'W4', start: 22, end: 31 },
-    ]
-    const weeklyBreakdown = weeks.map(w => {
+    const thursdayWeeks = getThursdayWeeks(year, now.getMonth() + 1)
+    const weeklyBreakdown = thursdayWeeks.map(w => {
       const wPayments = monthPaymentsAll.filter(p => {
-        const d = new Date(p.paidAt).getDate()
-        return d >= w.start && d <= w.end
+        const paidAt = new Date(p.paidAt)
+        return paidAt >= w.start && paidAt <= w.end
       })
       const buhanPay = wPayments.filter(p => p.deal.category === '物販').reduce((s, p) => s + p.amount, 0)
       const aiPay    = wPayments.filter(p => p.deal.category === 'AI').reduce((s, p) => s + p.amount, 0)
-      const wNum = weeks.indexOf(w) + 1
-      const isCurrent = wNum === weekNum
+      const isCurrent = now >= w.start && now <= w.end
       return {
         label: w.label,
-        weekNum: wNum,
+        weekNum: w.weekNum,
         isCurrent,
         buhan: { payment: buhanPay, target: buhanWeekTarget, achievementRate: calcAchievementRate(buhanPay, buhanWeekTarget) },
         ai:    { payment: aiPay,    target: aiWeekTarget,    achievementRate: calcAchievementRate(aiPay, aiWeekTarget) },
@@ -197,7 +200,7 @@ export async function GET() {
       members: memberStats,
       recentDeals: recentDeals.map((d) => ({ ...d, memberName: d.member.name })),
       urgentDeals: urgentDeals.map((d) => ({ ...d, memberName: d.member.name })),
-    })
+    }, { headers: { 'Access-Control-Allow-Origin': '*' } })
   } catch (error) {
     console.error('Dashboard API error:', error)
     return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 })

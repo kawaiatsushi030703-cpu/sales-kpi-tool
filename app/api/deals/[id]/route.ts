@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+function detectCategory(productName: string): string {
+  return /AI|ai|エーアイ/i.test(productName) ? 'AI' : '物販'
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: idStr } = await params
@@ -35,16 +39,25 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         customerName: body.customerName,
         memberId: body.memberId,
         productName: body.productName,
+        category: body.category ?? detectCategory(body.productName ?? ''),
         contractAmount,
         paymentAmount,
         remainingAmount: contractAmount - paymentAmount,
         status: body.status,
         nextAction: body.nextAction ?? null,
+        meetingDate: body.meetingDate ? new Date(body.meetingDate) : null,
         dueDate: body.dueDate ? new Date(body.dueDate) : null,
         notes: body.notes ?? null,
       },
       include: { member: { select: { name: true } } },
     })
+
+    // Payment テーブルを同期してKPI計算を正確に保つ
+    await prisma.payment.deleteMany({ where: { dealId: id } })
+    if (paymentAmount > 0) {
+      const paidAt = body.meetingDate ? new Date(body.meetingDate) : (deal.meetingDate ?? new Date())
+      await prisma.payment.create({ data: { dealId: id, amount: paymentAmount, paidAt } })
+    }
 
     // 通知の更新チェック
     await updateNotifications(id, deal.memberId, deal.customerName, body.dueDate, body.status)

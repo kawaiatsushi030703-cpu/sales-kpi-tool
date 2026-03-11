@@ -16,7 +16,7 @@ export function MemberProgressList({ members }: Props) {
       {sorted.map((member, index) => (
         <Link
           key={member.id}
-          href={`/members/${member.id}`}
+          href={`/dashboard/members/${member.id}`}
           className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
         >
           {/* 順位 */}

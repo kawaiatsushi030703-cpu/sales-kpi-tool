@@ -48,7 +48,7 @@ export default function NotificationsPage() {
     <>
       <Header title="通知" subtitle="期日が近い案件のアラート" />
 
-      <div className="p-6 space-y-4">
+      <div className="p-3 md:p-6 space-y-4">
         {/* メンバー別フィルター */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-3">

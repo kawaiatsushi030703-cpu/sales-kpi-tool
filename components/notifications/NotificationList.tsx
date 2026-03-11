@@ -1,7 +1,7 @@
 'use client'
 import { formatDate } from '@/lib/utils'
 import { NOTIFICATION_COLORS, NOTIFICATION_LABELS, NotificationType } from '@/types'
-import { CheckCircle, X, Bell } from 'lucide-react'
+import { X, Bell } from 'lucide-react'
 
 interface Notification {
   id: number
@@ -41,8 +41,27 @@ export function NotificationList({ notifications, onMarkRead, onDelete }: Props)
         return (
           <div
             key={n.id}
-            className={`flex items-start gap-3 p-4 rounded-xl border ${n.isRead ? 'opacity-50 bg-gray-50' : 'bg-white shadow-sm'}`}
+            className={`flex items-start gap-3 p-4 rounded-xl border transition-opacity ${
+              n.isRead ? 'opacity-40 bg-gray-50 border-gray-100' : 'bg-white shadow-sm border-gray-200'
+            }`}
           >
+            {/* チェックボックス */}
+            <button
+              onClick={() => onMarkRead(n.id)}
+              className={`shrink-0 mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                n.isRead
+                  ? 'bg-emerald-500 border-emerald-500 hover:bg-emerald-600'
+                  : 'border-gray-300 hover:border-emerald-400 bg-white'
+              }`}
+              title={n.isRead ? 'チェックを外す' : '対応済みにする'}
+            >
+              {n.isRead && (
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+
             {/* タイプバッジ */}
             <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-bold border ${colorClass}`}>
               {label}
@@ -50,7 +69,7 @@ export function NotificationList({ notifications, onMarkRead, onDelete }: Props)
 
             {/* 内容 */}
             <div className="flex-1 min-w-0">
-              <p className={`text-sm ${n.isRead ? 'text-gray-400' : 'text-gray-800 font-medium'}`}>
+              <p className={`text-sm ${n.isRead ? 'text-gray-400 line-through' : 'text-gray-800 font-medium'}`}>
                 {n.message}
               </p>
               <div className="flex gap-3 mt-1 text-xs text-gray-400">
@@ -61,25 +80,14 @@ export function NotificationList({ notifications, onMarkRead, onDelete }: Props)
               <p className="text-xs text-gray-400 mt-0.5">{formatDate(n.createdAt)}</p>
             </div>
 
-            {/* アクションボタン */}
-            <div className="flex gap-1 shrink-0">
-              {!n.isRead && (
-                <button
-                  onClick={() => onMarkRead(n.id)}
-                  className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                  title="既読にする"
-                >
-                  <CheckCircle size={16} />
-                </button>
-              )}
-              <button
-                onClick={() => onDelete(n.id)}
-                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                title="削除"
-              >
-                <X size={16} />
-              </button>
-            </div>
+            {/* 削除ボタン */}
+            <button
+              onClick={() => onDelete(n.id)}
+              className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors shrink-0"
+              title="削除"
+            >
+              <X size={16} />
+            </button>
           </div>
         )
       })}

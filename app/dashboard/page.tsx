@@ -39,6 +39,9 @@ function AnnualBanner({ annual }: { annual: { target: number; payment: number } 
       <div className="relative text-right">
         <p className="text-yellow-800 text-xs">累計着金</p>
         <p className="font-game text-yellow-300 text-lg">{formatCurrency(annual.payment)}</p>
+        <p className="text-yellow-500 text-sm font-bold mt-0.5">
+          {annual.target > 0 ? Math.floor(annual.payment / annual.target * 100) : 0}%
+        </p>
       </div>
     </div>
   )
@@ -160,7 +163,7 @@ function WeekCard({ week }: { week: WeekData }) {
 }
 
 export default function DashboardPage() {
-  const { data, error, isLoading } = useSWR('/api/dashboard', fetcher, { refreshInterval: 60000 })
+  const { data, error, isLoading } = useSWR('/api/dashboard', fetcher, { refreshInterval: 10000 })
 
   if (isLoading) {
     return (
@@ -185,7 +188,7 @@ export default function DashboardPage() {
     <>
       <Header title="ダッシュボード" subtitle={`${new Date().getFullYear()}年${new Date().getMonth() + 1}月`} />
 
-      <div className="p-6 space-y-5">
+      <div className="p-3 md:p-6 space-y-5">
         {data?.annual && <AnnualBanner annual={data.annual} />}
 
         {/* MONTHLY */}
@@ -210,7 +213,7 @@ export default function DashboardPage() {
         {/* WEEKLY */}
         <div>
           <p className="font-game text-gray-400 text-xs tracking-widest mb-3">── WEEKLY</p>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {(data?.weeklyBreakdown ?? []).map((w: WeekData) => (
               <WeekCard key={w.label} week={w} />
             ))}

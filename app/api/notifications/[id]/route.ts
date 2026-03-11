@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// 通知を既読にする
+// 通知の既読状態をトグル
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: idStr } = await params
     const id = parseInt(idStr)
+    const current = await prisma.notification.findUnique({ where: { id } })
     const notification = await prisma.notification.update({
       where: { id },
-      data: { isRead: true },
+      data: { isRead: !current?.isRead },
     })
     return NextResponse.json(notification)
   } catch (error) {

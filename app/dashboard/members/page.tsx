@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import { Header } from '@/components/layout/Header'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
@@ -17,8 +17,99 @@ const COLORS = ['#ef4444', '#f59e0b', '#3b82f6']
 
 interface MemberForm { name: string; targetAmount: number; avatarColor: string }
 
+function MemberCard({ m, onEdit, onDelete, onMutate }: {
+  m: Record<string, unknown>
+  onEdit: (m: Record<string, unknown>) => void
+  onDelete: (id: number) => void
+  onMutate: () => void
+}) {
+  const [target, setTarget] = useState(String(Math.round((m.targetAmount as number) / 10000)))
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!dirty) setTarget(String(Math.round((m.targetAmount as number) / 10000)))
+  }, [m.targetAmount]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSave = async () => {
+    if (!dirty) return
+    setSaving(true)
+    try {
+      await fetch(`/api/members/${m.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...m, targetAmount: Math.round((parseFloat(target) || 0) * 10000) }),
+      })
+      await onMutate()
+      setDirty(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Avatar name={m.name as string} color={m.avatarColor as string} size="lg" />
+          <p className="font-semibold text-gray-900">{m.name as string}</p>
+        </div>
+        <div className="flex gap-1">
+          <button onClick={() => onEdit(m)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors">
+            <Edit2 size={15} />
+          </button>
+          <button onClick={() => onDelete(m.id as number)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-500">着金進捗</span>
+          <span className="font-bold text-gray-700">{m.achievementRate as number}%</span>
+        </div>
+        <ProgressBar value={m.achievementRate as number} />
+        <div className="flex justify-between text-xs text-gray-500">
+          <span>{formatCurrency(m.paymentAmount as number)}</span>
+          <div className="flex items-center gap-1">
+            <span>目標</span>
+            <input
+              type="number"
+              className="w-16 px-1 py-0.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400 text-right"
+              value={target}
+              onChange={(e) => { setTarget(e.target.value); setDirty(true) }}
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+              disabled={saving}
+              min={0}
+              step="any"
+            />
+            <span>万円</span>
+            {dirty && (
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="ml-1 px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {saving ? '…' : '更新'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+        <span className="text-sm text-gray-500">担当案件: <span className="font-semibold text-gray-700">{m.dealCount as number}件</span></span>
+        <Link href={`/dashboard/members/${m.id}`} className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+          詳細を見る <ArrowRight size={13} />
+        </Link>
+      </div>
+    </Card>
+  )
+}
+
 export default function MembersPage() {
-  const { data: members, mutate } = useSWR('/api/members', fetcher)
+  const { data: members, mutate } = useSWR('/api/members', fetcher, { refreshInterval: 10000 })
   const [modalOpen, setModalOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<(MemberForm & { id?: number }) | null>(null)
   const [form, setForm] = useState<MemberForm>({ name: '', targetAmount: 0, avatarColor: '#ef4444' })
@@ -60,53 +151,14 @@ export default function MembersPage() {
     <>
       <Header title="メンバー管理" subtitle="メンバーの目標設定・進捗確認" />
 
-      <div className="p-6">
+      <div className="p-3 md:p-6">
         <div className="flex justify-end mb-4">
           <Button onClick={openCreate}><Plus size={16} />メンバーを追加</Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {(members ?? []).map((m: Record<string, unknown>) => (
-            <Card key={m.id as number} className="p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar name={m.name as string} color={m.avatarColor as string} size="lg" />
-                  <div>
-                    <p className="font-semibold text-gray-900">{m.name as string}</p>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => openEdit(m)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors">
-                    <Edit2 size={15} />
-                  </button>
-                  <button onClick={() => handleDelete(m.id as number)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">着金進捗</span>
-                  <span className="font-bold text-gray-700">{m.achievementRate as number}%</span>
-                </div>
-                <ProgressBar value={m.achievementRate as number} />
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>{formatCurrency(m.paymentAmount as number)}</span>
-                  <span>目標 {formatCurrency(m.targetAmount as number)}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-                <span className="text-sm text-gray-500">担当案件: <span className="font-semibold text-gray-700">{m.dealCount as number}件</span></span>
-                <Link
-                  href={`/members/${m.id}`}
-                  className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                >
-                  詳細を見る <ArrowRight size={13} />
-                </Link>
-              </div>
-            </Card>
+            <MemberCard key={m.id as number} m={m} onEdit={openEdit} onDelete={handleDelete} onMutate={mutate} />
           ))}
         </div>
       </div>

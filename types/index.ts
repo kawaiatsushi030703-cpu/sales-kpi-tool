@@ -1,36 +1,33 @@
 // 共通型定義
 
 export type DealStatus =
-  | '新規'
-  | '商談中'
-  | '後追い'
   | '成約'
+  | '未成約'
+  | '二回目遷移'
   | '一部決済'
-  | '分割決済中'
-  | '完了'
+  | '決済待ち'
+  | '後追い'
 
 export const DEAL_STATUSES: DealStatus[] = [
-  '新規', '商談中', '後追い', '成約', '一部決済', '分割決済中', '完了',
+  '成約', '未成約', '二回目遷移', '一部決済', '決済待ち', '後追い',
 ]
 
 export const STATUS_COLORS: Record<DealStatus, string> = {
-  '新規': 'bg-gray-100 text-gray-700',
-  '商談中': 'bg-blue-100 text-blue-700',
-  '後追い': 'bg-orange-100 text-orange-700',
-  '成約': 'bg-green-100 text-green-700',
-  '一部決済': 'bg-yellow-100 text-yellow-700',
-  '分割決済中': 'bg-purple-100 text-purple-700',
-  '完了': 'bg-emerald-100 text-emerald-700',
+  '成約':       'bg-green-100 text-green-700',
+  '未成約':     'bg-red-100 text-red-700',
+  '二回目遷移': 'bg-blue-100 text-blue-700',
+  '一部決済':   'bg-yellow-100 text-yellow-700',
+  '決済待ち':   'bg-purple-100 text-purple-700',
+  '後追い':     'bg-orange-100 text-orange-700',
 }
 
 export const STATUS_BORDER_COLORS: Record<DealStatus, string> = {
-  '新規': 'border-gray-300',
-  '商談中': 'border-blue-300',
-  '後追い': 'border-orange-400',
-  '成約': 'border-green-400',
-  '一部決済': 'border-yellow-400',
-  '分割決済中': 'border-purple-400',
-  '完了': 'border-emerald-400',
+  '成約':       'border-green-400',
+  '未成約':     'border-red-400',
+  '二回目遷移': 'border-blue-300',
+  '一部決済':   'border-yellow-400',
+  '決済待ち':   'border-purple-400',
+  '後追い':     'border-orange-400',
 }
 
 export type NotificationType = 'due_today' | 'due_1day' | 'due_3days' | 'overdue'

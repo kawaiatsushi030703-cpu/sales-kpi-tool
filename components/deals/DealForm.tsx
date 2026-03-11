@@ -5,14 +5,20 @@ import { DEAL_STATUSES } from '@/types'
 
 interface Member { id: number; name: string }
 
+function detectCategory(productName: string): string {
+  return /AI|ai|エーアイ/i.test(productName) ? 'AI' : '物販'
+}
+
 interface DealFormData {
   customerName: string
   memberId: number
   productName: string
+  category: string
   contractAmount: number
   paymentAmount: number
   status: string
   nextAction: string
+  meetingDate: string
   dueDate: string
   notes: string
 }
@@ -30,10 +36,12 @@ export function DealForm({ initial, onSubmit, onCancel, loading }: Props) {
     customerName: initial?.customerName ?? '',
     memberId: initial?.memberId ?? 0,
     productName: initial?.productName ?? '',
+    category: (initial?.category as string) ?? detectCategory(initial?.productName ?? ''),
     contractAmount: initial?.contractAmount ?? 0,
     paymentAmount: initial?.paymentAmount ?? 0,
-    status: initial?.status ?? '新規',
+    status: initial?.status ?? '後追い',
     nextAction: initial?.nextAction ?? '',
+    meetingDate: (initial?.meetingDate as string) ? (initial.meetingDate as string).slice(0, 10) : '',
     dueDate: initial?.dueDate ? initial.dueDate.slice(0, 10) : '',
     notes: initial?.notes ?? '',
   })
@@ -100,9 +108,35 @@ export function DealForm({ initial, onSubmit, onCancel, loading }: Props) {
           <input
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
             value={form.productName}
-            onChange={(e) => set('productName', e.target.value)}
+            onChange={(e) => {
+              set('productName', e.target.value)
+              set('category', detectCategory(e.target.value))
+            }}
             required
           />
+        </div>
+
+        {/* カテゴリ */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
+          <div className="flex gap-2">
+            {['物販', 'AI'].map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => set('category', c)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  form.category === c
+                    ? c === 'AI'
+                      ? 'bg-cyan-600 text-white border-cyan-600'
+                      : 'bg-orange-500 text-white border-orange-500'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* 契約額 */}
@@ -146,6 +180,17 @@ export function DealForm({ initial, onSubmit, onCancel, loading }: Props) {
             value={form.nextAction}
             onChange={(e) => set('nextAction', e.target.value)}
             placeholder="例: 電話フォロー、提案書送付"
+          />
+        </div>
+
+        {/* 面談日 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">面談日 <span className="text-xs text-gray-400">（週間集計の基準）</span></label>
+          <input
+            type="date"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            value={form.meetingDate}
+            onChange={(e) => set('meetingDate', e.target.value)}
           />
         </div>
 

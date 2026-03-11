@@ -34,6 +34,7 @@ model Deal {
   remainingAmount Int       @default(0)
   status          String    @default("新規")
   nextAction      String?
+  meetingDate     DateTime?
   dueDate         DateTime?
   notes           String?
   createdAt       DateTime  @default(now())

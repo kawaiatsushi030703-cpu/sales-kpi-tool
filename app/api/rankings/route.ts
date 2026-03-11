@@ -11,78 +11,48 @@ const ANNUAL_TARGETS: Record<string, number> = {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const period = searchParams.get('period') ?? 'monthly' // monthly | weekly | all
-    const category = searchParams.get('category') ?? '総合' // 総合 | 物販 | AI
+    const period = searchParams.get('period') ?? 'monthly'
+    const category = searchParams.get('category') ?? '総合'
 
-    const members = await prisma.member.findMany({
-      where: category !== '総合' ? { category } : undefined,
-      include: { deals: true },
-    })
+    const members = await prisma.member.findMany()
 
-    let rankingData: {
-      memberId: number
-      memberName: string
-      avatarColor: string
-      category: string
-      targetAmount: number
-      paymentAmount: number
-    }[] = []
+    // カテゴリフィルター: deal.categoryで絞り込む
+    const dealWhere = category !== '総合' ? { category } : {}
 
-    if (period === 'all') {
-      rankingData = members.map((m) => ({
-        memberId: m.id,
-        memberName: m.name,
-        avatarColor: m.avatarColor,
-        category: m.category,
-        targetAmount: m.targetAmount,
-        paymentAmount: m.deals.reduce((sum, d) => sum + d.paymentAmount, 0),
-      }))
-    } else if (period === 'monthly') {
+    const memberPayments: Record<number, number> = {}
+
+    if (period === 'monthly') {
       const { start, end } = getCurrentMonthRange()
       const payments = await prisma.payment.findMany({
-        where: { paidAt: { gte: start, lte: end } },
+        where: { paidAt: { gte: start, lte: end }, deal: dealWhere },
         include: { deal: { select: { memberId: true } } },
       })
-      const memberPayments: Record<number, number> = {}
       for (const p of payments) {
         const mid = p.deal.memberId
         memberPayments[mid] = (memberPayments[mid] ?? 0) + p.amount
       }
-      rankingData = members.map((m) => ({
-        memberId: m.id,
-        memberName: m.name,
-        avatarColor: m.avatarColor,
-        category: m.category,
-        targetAmount: m.targetAmount,
-        paymentAmount: memberPayments[m.id] ?? 0,
-      }))
     } else if (period === 'weekly') {
       const { start, end } = getCurrentWeekRange()
       const payments = await prisma.payment.findMany({
-        where: { paidAt: { gte: start, lte: end } },
+        where: { paidAt: { gte: start, lte: end }, deal: dealWhere },
         include: { deal: { select: { memberId: true } } },
       })
-      const memberPayments: Record<number, number> = {}
       for (const p of payments) {
         const mid = p.deal.memberId
         memberPayments[mid] = (memberPayments[mid] ?? 0) + p.amount
       }
-      // 週間個人目標 = 月間目標 / 4
-      rankingData = members.map((m) => ({
-        memberId: m.id,
-        memberName: m.name,
-        avatarColor: m.avatarColor,
-        category: m.category,
-        targetAmount: Math.round(m.targetAmount / 4),
-        paymentAmount: memberPayments[m.id] ?? 0,
-      }))
+    } else {
+      // all: deal.paymentAmountを直接集計
+      const deals = await prisma.deal.findMany({
+        where: dealWhere,
+        select: { memberId: true, paymentAmount: true },
+      })
+      for (const d of deals) {
+        memberPayments[d.memberId] = (memberPayments[d.memberId] ?? 0) + d.paymentAmount
+      }
     }
 
-    // チーム合計を計算
-    const teamTotal = rankingData.reduce((sum, m) => sum + m.paymentAmount, 0)
     const now2 = new Date()
-
-    // DBからチーム目標を取得
     let teamTarget = ANNUAL_TARGETS[category] ?? ANNUAL_TARGETS['総合']
     if (period === 'monthly') {
       const goal = await prisma.teamGoal.findFirst({
@@ -96,16 +66,23 @@ export async function GET(req: NextRequest) {
       teamTarget = weekGoal?.targetAmount ?? Math.round(teamTarget / 52)
     }
 
-    // 着金額でソートしてランク付け
+    const rankingData = members.map((m) => ({
+      memberId: m.id,
+      memberName: m.name,
+      avatarColor: m.avatarColor,
+      targetAmount: period === 'weekly' ? Math.round(m.targetAmount / 4) : m.targetAmount,
+      paymentAmount: memberPayments[m.id] ?? 0,
+    }))
+
+    const teamTotal = rankingData.reduce((sum, m) => sum + m.paymentAmount, 0)
+
     const sorted = rankingData
       .sort((a, b) => b.paymentAmount - a.paymentAmount)
-      .map((item, index) => ({
+      .map((item, index, arr) => ({
         rank: index + 1,
         ...item,
         achievementRate: calcAchievementRate(item.paymentAmount, item.targetAmount),
-        gapToNext: index > 0
-          ? rankingData.sort((a, b) => b.paymentAmount - a.paymentAmount)[index - 1].paymentAmount - item.paymentAmount
-          : 0,
+        gapToNext: index > 0 ? arr[index - 1].paymentAmount - item.paymentAmount : 0,
       }))
 
     return NextResponse.json({

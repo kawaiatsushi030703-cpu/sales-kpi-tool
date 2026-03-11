@@ -30,13 +30,32 @@ export function getCurrentMonthRange() {
   }
 }
 
-// 現在の週の開始・終了日（月曜始まり）
+// 現在の週の開始・終了日（木曜始まり）
 export function getCurrentWeekRange() {
   const now = new Date()
   return {
-    start: startOfWeek(now, { weekStartsOn: 1 }),
-    end: endOfWeek(now, { weekStartsOn: 1 }),
+    start: startOfWeek(now, { weekStartsOn: 4 }),
+    end: endOfWeek(now, { weekStartsOn: 4 }),
   }
+}
+
+// 木曜始まりで月内4週分の日付範囲を返す
+export function getThursdayWeeks(year: number, month: number) {
+  const monthStart = new Date(year, month - 1, 1)
+  const monthEnd = new Date(year, month, 0, 23, 59, 59)
+  // その月の1日を含む木曜始まりの週の開始日
+  const firstWeekStart = startOfWeek(monthStart, { weekStartsOn: 4 })
+
+  return [0, 1, 2, 3].map(i => {
+    const start = new Date(firstWeekStart.getTime() + i * 7 * 24 * 60 * 60 * 1000)
+    const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000 - 1)
+    return {
+      label: `W${i + 1}`,
+      weekNum: i + 1,
+      start,
+      end: end > monthEnd ? monthEnd : end,
+    }
+  })
 }
 
 // 日付をフォーマット
