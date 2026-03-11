@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// チームメンバー
+model Member {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  category      String   @default("物販")  // 物販 | AI
+  targetAmount  Int      @default(0)        // 月間個人目標
+  avatarColor   String   @default("#6366f1")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deals         Deal[]
+  notifications Notification[]
+}
+
+// 案件
+model Deal {
+  id              Int       @id @default(autoincrement())
+  customerName    String
+  memberId        Int
+  productName     String
+  category        String    @default("物販") // 物販 | AI
+  contractAmount  Int
+  paymentAmount   Int       @default(0)
+  remainingAmount Int       @default(0)
+  status          String    @default("新規")
+  nextAction      String?
+  dueDate         DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  member        Member    @relation(fields: [memberId], references: [id])
+  payments      Payment[]
+  notifications Notification[]
+}
+
+// 入金記録
+model Payment {
+  id        Int      @id @default(autoincrement())
+  dealId    Int
+  amount    Int
+  paidAt    DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+// 通知
+model Notification {
+  id        Int      @id @default(autoincrement())
+  dealId    Int
+  memberId  Int?
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  member    Member?  @relation(fields: [memberId], references: [id])
+}
+
+// チーム目標（月間/週間/年間 × カテゴリ）
+model TeamGoal {
+  id           Int      @id @default(autoincrement())
+  periodType   String   // monthly | weekly | annual
+  category     String   @default("総合") // 総合 | 物販 | AI
+  year         Int
+  month        Int?     // 月間/週間用
+  week         Int?     // 週間用
+  targetAmount Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([periodType, category, year, month, week])
+}
