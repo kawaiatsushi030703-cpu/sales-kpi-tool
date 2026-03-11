@@ -46,13 +46,13 @@ function detectColumns(headers: string[]) {
   const find = (...keys: string[]) => h.findIndex((col) => keys.some((k) => col.includes(k)))
   return {
     customerName:   find('顧客', 'customer', 'line名', 'お客', '名前', '氏名'),
-    memberName:     find('担当', 'member', 'メンバー'),
+    memberName:     find('担当', 'member', 'メンバー', 'クローザー'),
     productName:    find('商品', '製品', 'product', 'プラン', 'サービス'),
     category:       find('カテゴリ', 'category'),
     contractAmount: find('契約額', '売上', '売り上げ', 'contract', '金額'),
     paymentAmount:  find('着金', 'payment', '入金', '決済'),
     status:         find('ステータス', 'status', '状態'),
-    meetingDate:    find('面談日', '日時', 'meeting', '商談日'),
+    meetingDate:    find('面談日', '日時', 'meeting', '商談日', '年月日'),
     dueDate:        find('期日', 'due', '締切'),
     nextAction:     find('次回', 'action', 'アクション'),
     notes:          find('備考', '備考', 'notes', 'メモ'),
@@ -68,11 +68,31 @@ export async function POST(req: NextRequest) {
     if (!res.ok) throw new Error('スプレッドシートの取得に失敗しました。「リンクを知っている全員が閲覧可」に設定してください。')
     const text = await res.text()
 
-    // CSV解析
+    // CSV解析（引用符内カンマ対応）
+    function parseCsvLine(line: string): string[] {
+      const result: string[] = []
+      let cur = ''
+      let inQuote = false
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"') {
+          if (inQuote && line[i + 1] === '"') { cur += '"'; i++ }
+          else inQuote = !inQuote
+        } else if (ch === ',' && !inQuote) {
+          result.push(cur.trim())
+          cur = ''
+        } else {
+          cur += ch
+        }
+      }
+      result.push(cur.trim())
+      return result
+    }
+
     const lines = text.split('\n').filter((l) => l.trim())
     if (lines.length < 2) return NextResponse.json({ error: 'データが見つかりません' }, { status: 400 })
 
-    const headers = lines[0].split(',').map((h) => h.replace(/^"|"$/g, '').trim())
+    const headers = parseCsvLine(lines[0])
     const cols = detectColumns(headers)
 
     if (cols.customerName === -1) {
@@ -86,15 +106,20 @@ export async function POST(req: NextRequest) {
     // メンバー一覧を取得
     const members = await prisma.member.findMany()
     const findMember = (name: string) => {
-      const n = name.trim()
-      return members.find((m) => m.name === n || m.name.includes(n) || n.includes(m.name))
+      const n = name.trim().replace(/[\s　]/g, '')
+      if (!n) return undefined
+      return members.find((m) => {
+        const mn = m.name.replace(/[\s　]/g, '')
+        return mn === n || mn.includes(n) || n.includes(mn)
+      })
     }
 
     let imported = 0
     let skipped = 0
+    const unknownMembers = new Set<string>()
 
     for (let i = 1; i < lines.length; i++) {
-      const cells = lines[i].split(',').map((c) => c.replace(/^"|"$/g, '').trim())
+      const cells = parseCsvLine(lines[i])
       const get = (idx: number) => idx >= 0 ? (cells[idx] ?? '') : ''
 
       const customerName = get(cols.customerName)
@@ -102,7 +127,7 @@ export async function POST(req: NextRequest) {
 
       const memberNameStr = get(cols.memberName)
       const member = findMember(memberNameStr)
-      if (!member) { skipped++; continue }
+      if (!member) { if (memberNameStr) unknownMembers.add(memberNameStr); skipped++; continue }
 
       const productName = get(cols.productName) || '未設定'
       const categoryRaw = get(cols.category)
@@ -140,7 +165,7 @@ export async function POST(req: NextRequest) {
       imported++
     }
 
-    return NextResponse.json({ imported, skipped, total: lines.length - 1 })
+    return NextResponse.json({ imported, skipped, total: lines.length - 1, unknownMembers: [...unknownMembers] })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
