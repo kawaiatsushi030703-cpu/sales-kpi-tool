@@ -108,7 +108,7 @@ export default function MemberDetailPage({ params }: { params: Promise<{ id: str
                           <DealStatusBadge status={deal.status as string} />
                         </div>
                         <p className="text-sm text-gray-500 mt-0.5">{deal.productName as string}</p>
-                        {deal.nextAction && (
+                        {typeof deal.nextAction === "string" && deal.nextAction && (
                           <p className="text-xs text-indigo-600 mt-1">→ {deal.nextAction as string}</p>
                         )}
                       </div>
