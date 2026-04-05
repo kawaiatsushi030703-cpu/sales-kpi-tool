@@ -19,6 +19,7 @@ export async function GET() {
       email: m.email,
       targetAmount: m.targetAmount,
       avatarColor: m.avatarColor,
+      isAdmin: m.isAdmin,
       paymentAmount: m.deals.reduce((sum, d) => sum + d.paymentAmount, 0),
       achievementRate: calcAchievementRate(
         m.deals.reduce((sum, d) => sum + d.paymentAmount, 0),

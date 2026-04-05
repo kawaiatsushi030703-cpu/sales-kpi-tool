@@ -1,4 +1,5 @@
 'use client'
+import React from 'react'
 import { Bell, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import useSWR from 'swr'
@@ -8,9 +9,10 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 interface HeaderProps {
   title: string
   subtitle?: string
+  children?: React.ReactNode
 }
 
-export function Header({ title, subtitle }: HeaderProps) {
+export function Header({ title, subtitle, children }: HeaderProps) {
   const { data: notifications } = useSWR('/api/notifications', fetcher, { refreshInterval: 30000 })
   const unreadCount = Array.isArray(notifications) ? notifications.filter((n: { isRead: boolean }) => !n.isRead).length : 0
 
@@ -26,6 +28,8 @@ export function Header({ title, subtitle }: HeaderProps) {
           {subtitle && <p className="text-xs text-gray-500 hidden sm:block">{subtitle}</p>}
         </div>
       </div>
+      <div className="flex items-center gap-3">
+        {children}
       <Link href="/notifications" className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -34,6 +38,7 @@ export function Header({ title, subtitle }: HeaderProps) {
           </span>
         )}
       </Link>
+      </div>
     </header>
   )
 }

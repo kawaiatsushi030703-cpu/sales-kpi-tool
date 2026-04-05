@@ -136,7 +136,14 @@ export default function DealsPage() {
     setModalOpen(true)
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const openEdit = (deal: any) => { setLineInitial(null); setEditTarget(deal); setModalOpen(true) }
+  const openEdit = async (deal: any) => {
+    setLineInitial(null)
+    // payments履歴を含む詳細を取得してフォームに渡す
+    const res = await fetch(`/api/deals/${deal.id}`)
+    const detail = await res.json()
+    setEditTarget(detail)
+    setModalOpen(true)
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSubmit = async (formData: any) => {
@@ -275,14 +282,27 @@ export default function DealsPage() {
                   />
                 </div>
 
-                <select
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  value={filterMember}
-                  onChange={(e) => setFilterMember(e.target.value)}
-                >
-                  <option value="">全メンバー</option>
-                  {members?.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setFilterMember('')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      filterMember === ''
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >全員</button>
+                  {members?.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => setFilterMember(filterMember === String(m.id) ? '' : String(m.id))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        filterMember === String(m.id)
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >{m.name}</button>
+                  ))}
+                </div>
 
                 <select
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"

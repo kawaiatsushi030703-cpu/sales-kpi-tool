@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react'
 import { formatDate, getDueDateLabel } from '@/lib/utils'
 import { DealStatusBadge } from './DealStatusBadge'
-import { Avatar } from '@/components/ui/Avatar'
 import { Edit2, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 
 interface Deal {
@@ -100,10 +99,7 @@ function DealRow({ deal, onEdit, onDelete, onQuickUpdate, onCategoryToggle }: {
         <p className="text-xs text-gray-400">{deal.productName}</p>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Avatar name={deal.memberName} color={deal.memberColor} size="sm" />
-          <span className="text-gray-700">{deal.memberName}</span>
-        </div>
+        <span className="text-gray-700 font-medium">{deal.memberName}</span>
       </td>
       <td className="px-4 py-3"><DealStatusBadge status={deal.status} /></td>
       <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
@@ -171,9 +167,8 @@ function DealCard({ deal, onEdit, onDelete, onQuickUpdate, onCategoryToggle }: {
 
       {/* 担当者 + 日付 */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1.5">
-          <Avatar name={deal.memberName} color={deal.memberColor} size="sm" />
-          <span className="text-sm text-gray-600">{deal.memberName}</span>
+        <div className="flex items-center">
+          <span className="text-sm font-medium text-gray-700">{deal.memberName}</span>
         </div>
         <div className="text-right">
           {deal.meetingDate && (

@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* ローカルフォント（Google Fonts 未接続環境でも確実に表示） */
+@font-face {
+  font-family: 'Black Ops One';
+  src: url('/fonts/black-ops-one.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -12,7 +21,7 @@ body {
 }
 
 .font-game {
-  font-family: var(--font-black-ops), 'Black Ops One', sans-serif;
+  font-family: 'Black Ops One', var(--font-black-ops), sans-serif;
   letter-spacing: 0.03em;
 }
 

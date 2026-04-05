@@ -6,13 +6,9 @@ export function cn(...inputs: ClassValue[]) {
   return clsx(inputs)
 }
 
-// 金額を日本円形式にフォーマット
+// 金額をカンマ区切り整数形式にフォーマット（例: 7757000 → 7,757,000）
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(amount)
+  return new Intl.NumberFormat('en-US').format(Math.round(amount))
 }
 
 // 達成率を計算（target=0の場合は0を返す）

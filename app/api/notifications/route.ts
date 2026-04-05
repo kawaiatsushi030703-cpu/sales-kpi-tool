@@ -11,7 +11,15 @@ export async function GET(req: NextRequest) {
       where: memberId ? { memberId } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
-        deal: { select: { customerName: true, status: true, dueDate: true, memberId: true } },
+        deal: {
+          select: {
+            customerName: true,
+            status: true,
+            dueDate: true,
+            memberId: true,
+            member: { select: { name: true, avatarColor: true } },
+          },
+        },
         member: { select: { name: true } },
       },
     })

@@ -1,6 +1,4 @@
-import { Avatar } from '@/components/ui/Avatar'
 import { formatCurrency } from '@/lib/utils'
-import { Trophy, Medal, Flame } from 'lucide-react'
 
 interface RankingEntry {
   rank: number
@@ -14,27 +12,10 @@ interface RankingEntry {
   gapToNext: number
 }
 
-function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) return (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-b from-yellow-300 to-yellow-500 flex items-center justify-center shadow-md shrink-0">
-      <Trophy size={16} className="text-yellow-900" />
-    </div>
-  )
-  if (rank === 2) return (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-b from-gray-300 to-gray-400 flex items-center justify-center shadow-sm shrink-0">
-      <Medal size={16} className="text-gray-700" />
-    </div>
-  )
-  if (rank === 3) return (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-b from-amber-400 to-amber-600 flex items-center justify-center shadow-sm shrink-0">
-      <Medal size={16} className="text-amber-900" />
-    </div>
-  )
-  return (
-    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-      <span className="font-game text-gray-400 text-sm">{rank}</span>
-    </div>
-  )
+function rateColor(r: number) {
+  if (r >= 100) return { bar: 'from-emerald-400 to-emerald-500', text: 'text-emerald-500' }
+  if (r >= 70)  return { bar: 'from-amber-400 to-amber-500',    text: 'text-amber-500'   }
+  return              { bar: 'from-red-400 to-red-500',          text: 'text-red-500'     }
 }
 
 export function RankingTable({ rankings, teamTotal, teamTarget, teamAchievementRate }: {
@@ -42,69 +23,140 @@ export function RankingTable({ rankings, teamTotal, teamTarget, teamAchievementR
   teamTotal: number
   teamTarget: number
   teamAchievementRate: number
+  period?: string
 }) {
   if (!rankings || rankings.length === 0) {
     return <p className="text-center text-gray-400 py-8">データがありません</p>
   }
 
-  const leader = rankings[0]
+  const clr = rateColor(teamAchievementRate)
+  const barPct = Math.min(teamAchievementRate, 100)
+  const remaining = Math.max(0, teamTarget - teamTotal)
 
   return (
     <div className="space-y-3">
+
       {/* チーム合計 */}
-      <div className="bg-gray-900 rounded-xl px-4 py-3 flex items-center justify-between">
-        <div>
-          <p className="text-gray-400 text-xs">チーム合計</p>
-          <p className="font-game text-white text-xl mt-0.5">{formatCurrency(teamTotal)}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-gray-400 text-xs">目標</p>
-          <p className="text-gray-300 text-sm font-semibold">{formatCurrency(teamTarget)}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-gray-400 text-xs">達成率</p>
-          <p className={`font-game text-xl ${teamAchievementRate >= 100 ? 'text-emerald-400' : teamAchievementRate >= 70 ? 'text-amber-400' : 'text-red-400'}`}>
-            {teamAchievementRate}%
+      <div className="bg-gray-900 rounded-2xl p-5 space-y-4">
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-gray-500 text-xs uppercase tracking-widest mb-1">Team Total</p>
+            <p className={`font-bold leading-none text-4xl ${clr.text}`}>{formatCurrency(teamTotal)}</p>
+          </div>
+          <p className={`font-bold text-5xl leading-none ${clr.text}`}>
+            {teamAchievementRate}<span className="text-2xl">%</span>
           </p>
         </div>
+
+        <div className="space-y-1.5">
+          <div className="relative h-5 bg-gray-700 rounded-full overflow-hidden">
+            {[25, 50, 75].map(p => (
+              <div key={p} className="absolute top-0 bottom-0 w-px bg-gray-600 z-10" style={{ left: `${p}%` }} />
+            ))}
+            <div className={`h-full rounded-full bg-gradient-to-r ${clr.bar} transition-all duration-700 relative`}
+              style={{ width: `${barPct}%` }}>
+              <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/20 to-transparent" />
+            </div>
+          </div>
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>¥0</span>
+            <span className="text-gray-400">{remaining > 0 ? `残り ${formatCurrency(remaining)}` : '目標達成！'}</span>
+            <span>{formatCurrency(teamTarget)}</span>
+          </div>
+        </div>
+
+        {/* チーム別内訳 */}
+        {(() => {
+          const TEAMS = [
+            { color: '#3b82f6', label: '青' },
+            { color: '#f59e0b', label: '黄' },
+            { color: '#ef4444', label: '赤' },
+          ]
+          const teamTotals = TEAMS.map(t => ({
+            ...t,
+            amount: rankings.filter(r => r.avatarColor === t.color).reduce((s, r) => s + r.paymentAmount, 0),
+          })).filter(t => t.amount > 0)
+
+          return teamTotals.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-gray-500 text-xs uppercase tracking-wider">チーム別内訳</p>
+              <div className="relative h-3 rounded-full overflow-hidden bg-gray-700 flex">
+                {teamTotals.map(t => (
+                  <div key={t.color} className="h-full"
+                    style={{ width: `${teamTotal > 0 ? (t.amount / teamTotal) * 100 : 0}%`, background: t.color }} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 pt-0.5">
+                {teamTotals.map(t => (
+                  <span key={t.color} className="text-xs text-gray-400">
+                    {t.label}: {formatCurrency(t.amount)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null
+        })()}
       </div>
 
-      {/* ランキング */}
+      {/* ランキング行（アイコン一切なし） */}
       {rankings.map((entry) => {
         const isFirst = entry.rank === 1
-        const gap = leader.paymentAmount - entry.paymentAmount
+        const gap = rankings[0].paymentAmount - entry.paymentAmount
+        const memberPct = Math.min(entry.achievementRate, 100)
+        const mClr = rateColor(entry.achievementRate)
 
         return (
-          <div key={entry.memberId} className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all ${
-            isFirst
-              ? 'bg-yellow-50 border-yellow-200 shadow-sm'
-              : entry.rank === 2
-              ? 'bg-gray-50 border-gray-200'
-              : entry.rank === 3
-              ? 'bg-amber-50 border-amber-100'
-              : 'bg-white border-gray-100 hover:bg-gray-50'
-          }`}>
-            <RankBadge rank={entry.rank} />
+          <div
+            key={entry.memberId}
+            className={`px-5 py-4 rounded-xl border-2 transition-all ${
+              isFirst
+                ? 'border-yellow-400 shadow-lg'
+                : 'bg-white border-gray-100 hover:bg-gray-50'
+            }`}
+            style={isFirst ? {
+              background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 60%, #fffbeb 100%)',
+            } : {}}
+          >
+            <div className="flex items-center gap-4 mb-3">
+              {/* 順位（数字のみ） */}
+              <div className={`shrink-0 text-center ${isFirst ? 'w-10' : 'w-9'}`}>
+                <span className={`font-black leading-none ${
+                  isFirst ? 'text-4xl text-yellow-600' : 'text-xl text-gray-400'
+                }`}>{entry.rank}</span>
+              </div>
 
-            <Avatar name={entry.memberName} color={entry.avatarColor} size={isFirst ? 'lg' : 'md'} />
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className={`font-semibold text-gray-900 ${isFirst ? 'text-base' : 'text-sm'}`}>
+              {/* 名前のみ */}
+              <div className="flex-1 min-w-0">
+                <p className={`font-bold truncate ${isFirst ? 'text-xl text-gray-900' : 'text-base text-gray-800'}`}>
                   {entry.memberName}
                 </p>
-                {isFirst && <Flame size={14} className="text-orange-500" />}
-                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{entry.category}</span>
+                {!isFirst && gap > 0 && (
+                  <p className="text-xs text-gray-400 mt-0.5">1位まで {formatCurrency(gap)}</p>
+                )}
               </div>
-              {!isFirst && gap > 0 && (
-                <p className="text-xs text-gray-400 mt-0.5">1位まで {formatCurrency(gap)}</p>
-              )}
+
+              {/* 着金額・達成率 */}
+              <div className="text-right shrink-0">
+                <p className={`font-bold tabular-nums ${isFirst ? 'text-2xl text-gray-900' : 'text-lg text-gray-700'}`}>
+                  {formatCurrency(entry.paymentAmount)}
+                </p>
+                <p className={`text-xs font-bold mt-0.5 ${mClr.text}`}>{entry.achievementRate}%</p>
+              </div>
             </div>
 
-            {/* 着金額のみ */}
-            <p className={`font-game tabular-nums ${isFirst ? 'text-2xl text-gray-900' : 'text-lg text-gray-700'}`}>
-              {formatCurrency(entry.paymentAmount)}
-            </p>
+            {/* 進捗バー */}
+            <div className={`relative h-2.5 rounded-full overflow-hidden ${isFirst ? 'bg-yellow-100' : 'bg-gray-100'}`}>
+              {[25, 50, 75].map(p => (
+                <div key={p} className={`absolute top-0 bottom-0 w-px z-10 ${isFirst ? 'bg-yellow-200' : 'bg-gray-200'}`}
+                  style={{ left: `${p}%` }} />
+              ))}
+              <div className={`h-full rounded-full bg-gradient-to-r ${mClr.bar} transition-all duration-700`}
+                style={{ width: `${memberPct}%` }} />
+            </div>
+            <div className="flex justify-between text-xs text-gray-400 mt-1">
+              <span>{formatCurrency(entry.paymentAmount)}</span>
+              <span>目標 {formatCurrency(entry.targetAmount)}</span>
+            </div>
           </div>
         )
       })}

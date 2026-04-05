@@ -15,6 +15,7 @@ model Member {
   category      String   @default("物販")  // 物販 | AI
   targetAmount  Int      @default(0)        // 月間個人目標
   avatarColor   String   @default("#6366f1")
+  isAdmin       Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -43,6 +44,19 @@ model Deal {
   member        Member    @relation(fields: [memberId], references: [id])
   payments      Payment[]
   notifications Notification[]
+  events        DealEvent[]
+}
+
+// 活動履歴（面談・遷移・メモなど）
+model DealEvent {
+  id        Int      @id @default(autoincrement())
+  dealId    Int
+  type      String   // "二回目遷移" | "三回目遷移" | "成約" | "フォロー" | "その他"
+  date      DateTime
+  memo      String?
+  createdAt DateTime @default(now())
+
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 }
 
 // 入金記録
@@ -69,6 +83,22 @@ model Notification {
 
   deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
   member    Member?  @relation(fields: [memberId], references: [id])
+}
+
+// 月次売上サマリー（手動入力の合計値）
+model MonthlySummary {
+  id             Int      @id @default(autoincrement())
+  year           Int
+  month          Int
+  buhanContract  Int      @default(0)  // 物販 売上額
+  buhanPayment   Int      @default(0)  // 物販 着金額
+  aiContract     Int      @default(0)  // AI 売上額
+  aiPayment      Int      @default(0)  // AI 着金額
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([year, month])
 }
 
 // チーム目標（月間/週間/年間 × カテゴリ）

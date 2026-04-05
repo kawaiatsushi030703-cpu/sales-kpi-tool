@@ -5,7 +5,7 @@ import { Header } from '@/components/layout/Header'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { NotificationList } from '@/components/notifications/NotificationList'
-import { CheckCircle, User } from 'lucide-react'
+import { CheckCircle, User, RefreshCw } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -14,6 +14,7 @@ interface Member { id: number; name: string; avatarColor: string }
 export default function NotificationsPage() {
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null)
   const [showUnread, setShowUnread] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   const apiUrl = selectedMemberId
     ? `/api/notifications?memberId=${selectedMemberId}`
@@ -38,15 +39,38 @@ export default function NotificationsPage() {
     await mutate()
   }
 
+  const PROTECTED_STATUSES = ['一部決済', '決済待ち']
+
+  const handleSyncNotifications = async () => {
+    setSyncing(true)
+    try {
+      await fetch('/api/notifications/sync', { method: 'POST' })
+      await mutate()
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const handleMarkAllRead = async () => {
-    const unread = (notifications ?? []).filter((n: { isRead: boolean; id: number }) => !n.isRead)
+    const unread = (notifications ?? []).filter((n: { isRead: boolean; id: number; deal: { status: string } }) =>
+      !n.isRead && !PROTECTED_STATUSES.includes(n.deal?.status)
+    )
     await Promise.all(unread.map((n: { id: number }) => fetch(`/api/notifications/${n.id}`, { method: 'PUT' })))
     await mutate()
   }
 
   return (
     <>
-      <Header title="通知" subtitle="期日が近い案件のアラート" />
+      <Header title="通知" subtitle="期日が近い案件のアラート">
+        <button
+          onClick={handleSyncNotifications}
+          disabled={syncing}
+          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-indigo-600 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+          {syncing ? '同期中...' : '通知を更新'}
+        </button>
+      </Header>
 
       <div className="p-3 md:p-6 space-y-4">
         {/* メンバー別フィルター */}

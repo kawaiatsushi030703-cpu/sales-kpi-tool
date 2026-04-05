@@ -43,6 +43,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         email: body.email,
         targetAmount: body.targetAmount,
         avatarColor: body.avatarColor,
+        ...(body.isAdmin !== undefined ? { isAdmin: body.isAdmin } : {}),
       },
     })
     return NextResponse.json(member)

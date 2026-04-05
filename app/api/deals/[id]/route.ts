@@ -13,7 +13,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       where: { id },
       include: {
         member: { select: { name: true, avatarColor: true } },
-        payments: { orderBy: { paidAt: 'desc' } },
+        payments: { orderBy: { paidAt: 'asc' } },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        events: { orderBy: { date: 'asc' } } as any,
       },
     })
     if (!deal) return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
@@ -30,8 +32,78 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const id = parseInt(idStr)
     const body = await req.json()
 
-    const contractAmount = body.contractAmount ?? 0
-    const paymentAmount = body.paymentAmount ?? 0
+    const contractAmount = Math.round(body.contractAmount ?? 0)
+    const isQuickUpdate = body.editedPayments === undefined && body.additionalPaymentAmount === undefined
+
+    let paymentAmount: number
+
+    if (isQuickUpdate) {
+      // テーブルのクイック更新：Payment を入力値で全置換
+      const newPaymentAmount = Math.round(body.paymentAmount ?? 0)
+      await prisma.payment.deleteMany({ where: { dealId: id } })
+      if (newPaymentAmount > 0) {
+        const existing = await prisma.deal.findUnique({ where: { id }, select: { meetingDate: true } })
+        const paidAt = body.meetingDate ? new Date(body.meetingDate) : (existing?.meetingDate ?? new Date())
+        await prisma.payment.create({ data: { dealId: id, amount: newPaymentAmount, paidAt } })
+      }
+      paymentAmount = newPaymentAmount
+    } else {
+      // フォーム経由の詳細更新
+
+      // 1. 削除対象のPaymentを削除
+      const deletedPaymentIds: number[] = body.deletedPaymentIds ?? []
+      if (deletedPaymentIds.length > 0) {
+        await prisma.payment.deleteMany({ where: { id: { in: deletedPaymentIds }, dealId: id } })
+      }
+
+      // 2. 既存Paymentを編集（金額・日付の修正）
+      const editedPayments: { id: number; amount: number; paidAt: string }[] = body.editedPayments ?? []
+      for (const ep of editedPayments) {
+        await prisma.payment.update({
+          where: { id: ep.id },
+          data: { amount: Math.round(ep.amount), paidAt: new Date(ep.paidAt) },
+        })
+      }
+
+      // 3. 追加決済があれば新規Paymentレコードを追加
+      const additionalPaymentAmount = Math.round(body.additionalPaymentAmount ?? 0)
+      const additionalPaymentDate = body.additionalPaymentDate ?? null
+      if (additionalPaymentAmount > 0) {
+        const paidAt = additionalPaymentDate ? new Date(additionalPaymentDate) : new Date()
+        await prisma.payment.create({ data: { dealId: id, amount: additionalPaymentAmount, paidAt } })
+      }
+
+      // 4. Paymentの合計から paymentAmount を再計算
+      const allPayments = await prisma.payment.findMany({ where: { dealId: id } })
+      paymentAmount = allPayments.reduce((s, p) => s + p.amount, 0)
+
+      // Paymentが0件かつ paymentAmount が手動入力されていれば1件作成
+      if (allPayments.length === 0 && (body.paymentAmount ?? 0) > 0) {
+        const paidAt = body.meetingDate ? new Date(body.meetingDate) : new Date()
+        await prisma.payment.create({ data: { dealId: id, amount: Math.round(body.paymentAmount), paidAt } })
+        paymentAmount = Math.round(body.paymentAmount)
+      }
+    }
+
+    // 5. 活動イベントの追加・削除
+    const newEvents: { type: string; date: string; memo?: string }[] = body.newEvents ?? []
+    for (const ev of newEvents) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma as any).dealEvent.create({
+        data: { dealId: id, type: ev.type, date: new Date(ev.date), memo: ev.memo ?? null },
+      })
+    }
+    const deletedEventIds: number[] = body.deletedEventIds ?? []
+    if (deletedEventIds.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma as any).dealEvent.deleteMany({ where: { id: { in: deletedEventIds }, dealId: id } })
+    }
+
+    // 6. 一部決済が全額に達したら自動でステータスを「成約」に変更
+    let status = body.status as string
+    if (contractAmount > 0 && paymentAmount >= contractAmount && status === '一部決済') {
+      status = '成約'
+    }
 
     const deal = await prisma.deal.update({
       where: { id },
@@ -43,7 +115,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         contractAmount,
         paymentAmount,
         remainingAmount: contractAmount - paymentAmount,
-        status: body.status,
+        status,
         nextAction: body.nextAction ?? null,
         meetingDate: body.meetingDate ? new Date(body.meetingDate) : null,
         dueDate: body.dueDate ? new Date(body.dueDate) : null,
@@ -52,15 +124,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       include: { member: { select: { name: true } } },
     })
 
-    // Payment テーブルを同期してKPI計算を正確に保つ
-    await prisma.payment.deleteMany({ where: { dealId: id } })
-    if (paymentAmount > 0) {
+    // Paymentが0件かつ paymentAmount が手動入力されていれば1件作成（新規案件用の後方互換）
+    if (allPayments.length === 0 && (body.paymentAmount ?? 0) > 0) {
       const paidAt = body.meetingDate ? new Date(body.meetingDate) : (deal.meetingDate ?? new Date())
-      await prisma.payment.create({ data: { dealId: id, amount: paymentAmount, paidAt } })
+      await prisma.payment.create({ data: { dealId: id, amount: body.paymentAmount, paidAt } })
     }
 
     // 通知の更新チェック
-    await updateNotifications(id, deal.memberId, deal.customerName, body.dueDate, body.status)
+    await updateNotifications(id, deal.memberId, deal.customerName, body.dueDate, status)
 
     return NextResponse.json({ ...deal, memberName: deal.member.name })
   } catch (error) {
@@ -81,6 +152,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 }
 
+const URGENT_STATUSES = ['一部決済', '決済待ち']
+
 // 案件更新時に通知を再生成
 async function updateNotifications(
   dealId: number,
@@ -90,11 +163,29 @@ async function updateNotifications(
   status: string
 ) {
   // 完了案件の通知は削除
-  if (status === '完了') {
+  if (status === '完了' || status === '成約') {
     await prisma.notification.deleteMany({ where: { dealId } })
     return
   }
 
+  // 一部決済・決済待ちは期限に関係なく必ず通知を生成・維持
+  if (URGENT_STATUSES.includes(status)) {
+    const type = status === '一部決済' ? 'partial_payment' : 'payment_pending'
+    const message =
+      status === '一部決済'
+        ? `【一部決済】「${customerName}」案件の残額の回収が未完了です`
+        : `【決済待ち】「${customerName}」案件の決済が完了していません`
+
+    const existing = await prisma.notification.findFirst({ where: { dealId } })
+    if (existing) {
+      await prisma.notification.update({ where: { id: existing.id }, data: { type, message, isRead: false } })
+    } else {
+      await prisma.notification.create({ data: { dealId, memberId, type, message } })
+    }
+    return
+  }
+
+  // 以降は期限ベースの通知（一部決済・決済待ち以外）
   if (!dueDateStr) return
 
   const dueDate = new Date(dueDateStr)
